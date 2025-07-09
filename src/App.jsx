@@ -3,16 +3,25 @@ import { MapPin, Car, Clock, Download, Share2, CircleCheck, AlignJustify, Circle
 
 
 const App = () => {
-  const [currentStep, setCurrentStep] = useState('landing');
-  const [formData, setFormData] = useState({
-    date: '',
-    purpose: '',
-    startPostcode: '',
-    startMileage: '',
-    endPostcode: '',
-    endMileage: '',
-    totalDistance: 0
-  });
+
+const getInitialStep = () => localStorage.getItem('jossCurrentStep') || 'landing';
+const getInitialFormData = () => {
+  const saved = localStorage.getItem('jossFormData');
+  return saved
+    ? JSON.parse(saved)
+    : {
+        date: '',
+        purpose: '',
+        startPostcode: '',
+        startMileage: '',
+        endPostcode: '',
+        endMileage: '',
+        totalDistance: 0
+      };
+};
+
+const [currentStep, setCurrentStep] = useState(getInitialStep);
+const [formData, setFormData] = useState(getInitialFormData);
   const [isLoading, setIsLoading] = useState(false);
   const [journeyListRefresh, setJourneyListRefresh] = useState(0);
 
@@ -22,6 +31,18 @@ const App = () => {
       localStorage.setItem('jossJourneyData', JSON.stringify([]));
     }
   }, []);
+
+  // STATE PERSISTANCE USING LOCAL STORAGE
+  // Save formData and currentStep to localStorage on change
+  useEffect(() => {
+    localStorage.setItem('jossCurrentStep', currentStep);
+  }, [currentStep]);
+
+  useEffect(() => {
+    localStorage.setItem('jossFormData', JSON.stringify(formData));
+  }, [formData]);
+
+
 
   const goHome = () => {
     setCurrentStep('landing');
@@ -84,50 +105,54 @@ const App = () => {
   };
 
   // Start new journey
-const startNewJourney = async () => {
-  const today = new Date().toLocaleDateString();
-  setFormData({
-    date: today,
-    purpose: '',
-    startPostcode: '',
-    startMileage: '',
-    endPostcode: '',
-    endMileage: '',
-    totalDistance: 0
-  });
-  setIsLoading(true);
-  setShowPostcodeChoices(false);
-  try {
-    const location = await getCurrentLocation();
-    const postcodes = await getPostcodeFromLocation(location.lat, location.lon);
+  const startNewJourney = async () => {
+    const today = new Date().toLocaleDateString();
+    setFormData({
+      date: today,
+      purpose: '',
+      startPostcode: '',
+      startMileage: '',
+      endPostcode: '',
+      endMileage: '',
+      totalDistance: 0
+    });
+    setIsLoading(true);
+    setShowPostcodeChoices(false);
+    try {
+      const location = await getCurrentLocation();
+      const postcodes = await getPostcodeFromLocation(location.lat, location.lon);
 
-    setPostcodeOptions(postcodes);
+      setPostcodeOptions(postcodes);
 
-    // Auto-select first postcode
-    setFormData(prev => ({
-      ...prev,
-      startPostcode: postcodes[0]
-    }));
-    setCurrentStep('autoStartPostcode');
-  } catch (error) {
-    console.error('Error getting start location:', error);
-    setCurrentStep('locationError');
-  }
-  setIsLoading(false);
-};
+      // Auto-select first postcode
+      setFormData(prev => ({
+        ...prev,
+        startPostcode: postcodes[0]
+      }));
+      setCurrentStep('autoStartPostcode');
+    } catch (error) {
+      console.error('Error getting start location:', error);
+      setCurrentStep('locationError');
+    }
+    setIsLoading(false);
+  };
 
   // Finish trip - get end location
   const finishTrip = async () => {
     setIsLoading(true);
+    setShowPostcodeChoices(false);
     try {
       const location = await getCurrentLocation();
-      const postcode = await getPostcodeFromLocation(location.lat, location.lon);
+      const postcodes = await getPostcodeFromLocation(location.lat, location.lon);
 
-      setFormData({
-        ...formData,
-        endPostcode: postcode
-      });
-      setCurrentStep('endMileage');
+      setPostcodeOptions(postcodes);
+
+      // Auto-select first postcode
+      setFormData(prev => ({
+        ...prev,
+        endPostcode: postcodes[0]
+      }));
+      setCurrentStep('autoEndPostcode');
     } catch (error) {
       console.error('Error getting end location:', error);
       setCurrentStep('endLocationError');
@@ -355,53 +380,53 @@ Total Distance: ${formData.totalDistance} miles`;
       )}
 
       {currentStep === 'autoStartPostcode' && (
-  <div className="flex flex-col items-center justify-center min-h-full p-6">
-    <button className='flex gap-2 items-center mb-6 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg transition-colors absolute left-5 top-5' onClick={goHome}>
-      <CircleX /> Cancel Trip
-    </button>
-    <div className="w-full max-w-md">
-      <h2 className="text-2xl font-bold text-gray-900 mb-8 text-center">Start Postcode</h2>
-      <div className="flex flex-col gap-4 items-center">
-        <div className="text-4xl font-semibold mb-4">{formData.startPostcode}</div>
-        <button
-          className="text-blue-600 underline mb-8"
-          onClick={() => setShowPostcodeChoices(true)}
-        >
-          Not correct? Choose another
-        </button>
-        <button
-          onClick={() => setCurrentStep('purpose')}
-          className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-4 rounded-lg text-xl transition-colors"
-        >
-          Continue
-        </button>
-      </div>
-      {/* Show postcode choices if requested */}
-      {showPostcodeChoices && (
-        <div className="mt-8">
-          <h3 className="text-lg font-semibold mb-4 text-center">Choose Your Start Postcode</h3>
-          <div className="flex flex-col gap-4">
-            {postcodeOptions.map((postcode, idx) => (
+        <div className="flex flex-col items-center justify-center min-h-full p-6">
+          <button className='flex gap-2 items-center mb-6 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg transition-colors absolute left-5 top-5' onClick={goHome}>
+            <CircleX /> Cancel Trip
+          </button>
+          <div className="w-full max-w-md">
+            <h2 className="text-2xl font-bold text-gray-900 mb-8 text-center">Start Postcode</h2>
+            <div className="flex flex-col gap-4 items-center">
+              <div className="text-4xl font-semibold mb-4">{formData.startPostcode}</div>
               <button
-                key={postcode}
-                onClick={() => {
-                  setFormData(prev => ({
-                    ...prev,
-                    startPostcode: postcode
-                  }));
-                  setShowPostcodeChoices(false);
-                }}
-                className={`w-full ${formData.startPostcode === postcode ? 'bg-blue-700' : 'bg-blue-500'} hover:bg-blue-600 text-white font-semibold py-4 rounded-lg text-xl transition-colors`}
+                className="text-blue-600 underline mb-8"
+                onClick={() => setShowPostcodeChoices(true)}
               >
-                {postcode}
+                Not correct? Choose another
               </button>
-            ))}
+              <button
+                onClick={() => setCurrentStep('purpose')}
+                className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-4 rounded-lg text-xl transition-colors"
+              >
+                Continue
+              </button>
+            </div>
+            {/* Show postcode choices if requested */}
+            {showPostcodeChoices && (
+              <div className="mt-8">
+                <h3 className="text-lg font-semibold mb-4 text-center">Choose Your Start Postcode</h3>
+                <div className="flex flex-col gap-4">
+                  {postcodeOptions.map((postcode, idx) => (
+                    <button
+                      key={postcode}
+                      onClick={() => {
+                        setFormData(prev => ({
+                          ...prev,
+                          startPostcode: postcode
+                        }));
+                        setShowPostcodeChoices(false);
+                      }}
+                      className={`w-full ${formData.startPostcode === postcode ? 'bg-blue-700' : 'bg-blue-500'} hover:bg-blue-600 text-white font-semibold py-4 rounded-lg text-xl transition-colors`}
+                    >
+                      {postcode}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
-    </div>
-  </div>
-)}
 
       {/* Purpose Input */}
       {currentStep === 'purpose' && (
@@ -538,6 +563,55 @@ Total Distance: ${formData.totalDistance} miles`;
             >
               Continue
             </button>
+          </div>
+        </div>
+      )}
+
+      {currentStep === 'autoEndPostcode' && (
+        <div className="flex flex-col items-center justify-center min-h-full p-6">
+          <button className='flex gap-2 items-center mb-6 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg transition-colors absolute left-5 top-5' onClick={goHome}>
+            <CircleX /> Cancel Trip
+          </button>
+          <div className="w-full max-w-md">
+            <h2 className="text-2xl font-bold text-gray-900 mb-8 text-center">End Postcode</h2>
+            <div className="flex flex-col gap-4 items-center">
+              <div className="text-4xl font-semibold mb-4">{formData.endPostcode}</div>
+              <button
+                className="text-blue-600 underline mb-8"
+                onClick={() => setShowPostcodeChoices(true)}
+              >
+                Not correct? Choose another
+              </button>
+              <button
+                onClick={() => setCurrentStep('endMileage')}
+                className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-4 rounded-lg text-xl transition-colors"
+              >
+                Continue
+              </button>
+            </div>
+            {/* Show postcode choices if requested */}
+            {showPostcodeChoices && (
+              <div className="mt-8">
+                <h3 className="text-lg font-semibold mb-4 text-center">Choose Your End Postcode</h3>
+                <div className="flex flex-col gap-4">
+                  {postcodeOptions.map((postcode, idx) => (
+                    <button
+                      key={postcode}
+                      onClick={() => {
+                        setFormData(prev => ({
+                          ...prev,
+                          endPostcode: postcode
+                        }));
+                        setShowPostcodeChoices(false);
+                      }}
+                      className={`w-full ${formData.endPostcode === postcode ? 'bg-blue-700' : 'bg-blue-500'} hover:bg-blue-600 text-white font-semibold py-4 rounded-lg text-xl transition-colors`}
+                    >
+                      {postcode}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
