@@ -7,6 +7,8 @@
   color: rgba(255, 255, 255, 0.87);
 
 
+
+
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -20,6 +22,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
+
 }
 
 a {
@@ -37,7 +40,9 @@ body {
   display: flex;
   place-items: center;
   min-width: 320px;
-  min-height: 100vh;
+  min-height: 100dvh;
+  background-color: #646cff;
+
 
 }
 

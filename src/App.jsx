@@ -38,22 +38,25 @@ const App = () => {
   }
 
   // Function to get postcode from coordinates using postcodes.io API
+  const [postcodeOptions, setPostcodeOptions] = useState([]);
+  const [showPostcodeChoices, setShowPostcodeChoices] = useState(false);
+
   const getPostcodeFromLocation = async (lat, lon) => {
     try {
       const response = await fetch(`https://api.postcodes.io/postcodes?lon=${lon}&lat=${lat}`);
       const data = await response.json();
 
       if (data.status === 200 && data.result && data.result.length > 0) {
-        // Return the closest postcode
-        return data.result[0].postcode;
+        // Return up to 3 nearest postcodes
+        return data.result.slice(0, 3).map(r => r.postcode);
       } else {
         // Fallback if no postcode found
-        return `Location: ${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+        return [`Location: ${lat.toFixed(4)}, ${lon.toFixed(4)}`];
       }
     } catch (error) {
       console.error('Error fetching postcode:', error);
       // Fallback to coordinates if API fails
-      return `Location: ${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+      return [`Location: ${lat.toFixed(4)}, ${lon.toFixed(4)}`];
     }
   };
 
@@ -63,10 +66,12 @@ const App = () => {
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           (position) => {
-            resolve({
+            const location = {
               lat: position.coords.latitude,
               lon: position.coords.longitude
-            });
+            };
+            console.log('Location found:', location);
+            resolve(location);
           },
           (error) => {
             reject(error);
@@ -79,34 +84,37 @@ const App = () => {
   };
 
   // Start new journey
-  const startNewJourney = async () => {
-    // Reset form data with today's date
-    const today = new Date().toLocaleDateString();
-    setFormData({
-      date: today,
-      purpose: '',
-      startPostcode: '',
-      startMileage: '',
-      endPostcode: '',
-      endMileage: '',
-      totalDistance: 0
-    });
-    setIsLoading(true);
-    try {
-      const location = await getCurrentLocation();
-      const postcode = await getPostcodeFromLocation(location.lat, location.lon);
+const startNewJourney = async () => {
+  const today = new Date().toLocaleDateString();
+  setFormData({
+    date: today,
+    purpose: '',
+    startPostcode: '',
+    startMileage: '',
+    endPostcode: '',
+    endMileage: '',
+    totalDistance: 0
+  });
+  setIsLoading(true);
+  setShowPostcodeChoices(false);
+  try {
+    const location = await getCurrentLocation();
+    const postcodes = await getPostcodeFromLocation(location.lat, location.lon);
 
-      setFormData(prev => ({
-        ...prev,
-        startPostcode: postcode
-      }));
-      setCurrentStep('purpose');
-    } catch (error) {
-      console.error('Error getting start location:', error);
-      setCurrentStep('locationError');
-    }
-    setIsLoading(false);
-  };
+    setPostcodeOptions(postcodes);
+
+    // Auto-select first postcode
+    setFormData(prev => ({
+      ...prev,
+      startPostcode: postcodes[0]
+    }));
+    setCurrentStep('autoStartPostcode');
+  } catch (error) {
+    console.error('Error getting start location:', error);
+    setCurrentStep('locationError');
+  }
+  setIsLoading(false);
+};
 
   // Finish trip - get end location
   const finishTrip = async () => {
@@ -293,7 +301,7 @@ Total Distance: ${formData.totalDistance} miles`;
       {currentStep === 'landing' && (
         <div className="flex flex-col items-center justify-center min-h-full p-6">
 
-          <button className='flex gap-2 items-center mb-6 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg transition-colors absolute left-5 top-5' onClick={() => setCurrentStep('myJourneys')}>
+          <button className='flex gap-2 items-center mb-6 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg transition-colors fixed left-5 top-5' onClick={() => setCurrentStep('myJourneys')}>
             <AlignJustify /> My Journeys
           </button>
 
@@ -345,6 +353,55 @@ Total Distance: ${formData.totalDistance} miles`;
           </div>
         </div>
       )}
+
+      {currentStep === 'autoStartPostcode' && (
+  <div className="flex flex-col items-center justify-center min-h-full p-6">
+    <button className='flex gap-2 items-center mb-6 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg transition-colors absolute left-5 top-5' onClick={goHome}>
+      <CircleX /> Cancel Trip
+    </button>
+    <div className="w-full max-w-md">
+      <h2 className="text-2xl font-bold text-gray-900 mb-8 text-center">Start Postcode</h2>
+      <div className="flex flex-col gap-4 items-center">
+        <div className="text-4xl font-semibold mb-4">{formData.startPostcode}</div>
+        <button
+          className="text-blue-600 underline mb-8"
+          onClick={() => setShowPostcodeChoices(true)}
+        >
+          Not correct? Choose another
+        </button>
+        <button
+          onClick={() => setCurrentStep('purpose')}
+          className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-4 rounded-lg text-xl transition-colors"
+        >
+          Continue
+        </button>
+      </div>
+      {/* Show postcode choices if requested */}
+      {showPostcodeChoices && (
+        <div className="mt-8">
+          <h3 className="text-lg font-semibold mb-4 text-center">Choose Your Start Postcode</h3>
+          <div className="flex flex-col gap-4">
+            {postcodeOptions.map((postcode, idx) => (
+              <button
+                key={postcode}
+                onClick={() => {
+                  setFormData(prev => ({
+                    ...prev,
+                    startPostcode: postcode
+                  }));
+                  setShowPostcodeChoices(false);
+                }}
+                className={`w-full ${formData.startPostcode === postcode ? 'bg-blue-700' : 'bg-blue-500'} hover:bg-blue-600 text-white font-semibold py-4 rounded-lg text-xl transition-colors`}
+              >
+                {postcode}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  </div>
+)}
 
       {/* Purpose Input */}
       {currentStep === 'purpose' && (
@@ -520,7 +577,7 @@ Total Distance: ${formData.totalDistance} miles`;
       {currentStep === 'final' && (
         <div className="flex flex-col items-center justify-center min-h-full p-6">
 
-          <button className='flex gap-2 items-center mb-6 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg transition-colors absolute left-5 top-5' onClick={() => setCurrentStep('myJourneys')}>
+          <button className='flex gap-2 items-center mb-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg transition-colors  left-5 top-5' onClick={() => setCurrentStep('myJourneys')}>
             <AlignJustify /> My Journeys
           </button>
 
